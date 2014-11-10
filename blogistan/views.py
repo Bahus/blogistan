@@ -9,7 +9,7 @@ from .models import Post
 @view_config(route_name='home', renderer='templates/mytemplate.pt')
 def my_view(request):
     try:
-        posts = Post.get_list(update_counters=True)
+        posts = Post.get_data_list(update_counters=True)
     except DBAPIError as ex:
         return Response(
             'Internal Server Error: {}'.format(ex),

@@ -41,7 +41,7 @@ class TestSomeServerSideLogic(BaseTest):
         with transaction.manager:
             self.session.add_all([post1, post2, view_count])
 
-        post_data = Post.get_list()
+        post_data = Post.get_data_list()
         self.assertEqual(len(post_data), 3)
 
         self.assertItemsEqual(
@@ -60,8 +60,13 @@ class TestSomeServerSideLogic(BaseTest):
         )
 
     def test_counter_increment(self):
-        counter = self.post.create_or_increment_counter(commit=True)
+        with transaction.manager:
+            self.session.add(self.post)
+            counter = self.post.create_or_increment_counter()
+
         self.assertEqual(counter.count, 1)
 
-        counter = self.post.create_or_increment_counter(commit=True)
+        with transaction.manager:
+            counter = self.post.create_or_increment_counter()
+
         self.assertEqual(counter.count, 2)
