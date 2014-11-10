@@ -3,8 +3,7 @@ import unittest
 import transaction
 
 from pyramid import testing
-from sqlalchemy import create_engine, asc
-from sqlalchemy.orm import joinedload
+from sqlalchemy import create_engine
 
 from blogistan.models import DBSession, Base, User, Post, PostViewCount
 
@@ -61,8 +60,8 @@ class TestSomeServerSideLogic(BaseTest):
         )
 
     def test_counter_increment(self):
-        counter = self.post.create_or_increment_counter()
+        counter = self.post.create_or_increment_counter(commit=True)
         self.assertEqual(counter.count, 1)
 
-        counter = self.post.create_or_increment_counter()
+        counter = self.post.create_or_increment_counter(commit=True)
         self.assertEqual(counter.count, 2)

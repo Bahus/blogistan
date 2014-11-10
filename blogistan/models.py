@@ -49,48 +49,61 @@ class Post(Base):
     @classmethod
     def get_list(cls, update_counters=False):
         posts_data = []
-        posts = (
-            DBSession().query(cls)
+
+        with transaction.manager:
+            session = DBSession()
+
+            posts = (
+                session.query(cls)
                        .options(joinedload('author'))
                        .options(joinedload('view_count'))
                        .order_by(desc(cls.id))
                        .all()
-        )[:cls.PER_PAGE_COUNT]
+            )[:cls.PER_PAGE_COUNT]
 
-        for post in posts:
+            for post in posts:
 
-            posts_data.append({
-                'post_body': post.body,
-                'username': post.author.name,
-                'view_count': post.view_count.count if post.view_count else 1
-            })
+                post_data = {
+                    'post_body': post.body,
+                    'username': post.author.name,
+                    'view_count': post.view_count.count if post.view_count else 1
+                }
 
-            if update_counters:
-                # При увеличении счетчиков просмотра не требуется оптимизировать
-                # код для пакетного обновления, можно увеличивать их по одному.
-                counter = post.create_or_increment_counter()
-                posts_data['view_count'] = counter.count
+                if update_counters:
+                    # При увеличении счетчиков просмотра не требуется
+                    # оптимизировать код для пакетного обновления, можно
+                    # увеличивать их по одному.
+                    counter = post.create_or_increment_counter(session)
+                    post_data['view_count'] = counter.count
+
+                posts_data.append(post_data)
 
         return posts_data
 
-    def create_or_increment_counter(self):
+    def create_or_increment_counter(self, session=None, commit=False):
         """Создаем запись в просмотрах поста, если ее нет,
         а если есть, то атомарно увеличиваем на 1
         """
-        with transaction.manager:
-            session = DBSession()
-            session.add(self)
+        actual_session = session or DBSession()
+        actual_session.add(self)
 
-            if self.view_count is not None:
-                self.view_count.count = PostViewCount.count + 1
-                session.add(self.view_count)
-                session.flush()
-                session.refresh(self.view_count)
-                return self.view_count
-            else:
-                self.view_count = PostViewCount(post=self)
-                session.add(self.view_count)
-                return self.view_count
+        if self.view_count is not None:
+            self.view_count.count = PostViewCount.count + 1
+            actual_session.add(self.view_count)
+            actual_session.flush()
+            # TODO: здесь можно сэкономить запрос, просто добавив
+            # 1 к текущему значению, оно будет менее точно, но это не
+            # принципиально
+            actual_session.refresh(self.view_count)
+        else:
+            self.view_count = PostViewCount(post=self)
+            actual_session.add(self.view_count)
+            actual_session.flush()
+
+        if commit:
+            transaction.commit()
+
+        return self.view_count
 
     def __repr__(self):
         return u'<Post(id={}, author={})>'.format(self.id, self.author.name)

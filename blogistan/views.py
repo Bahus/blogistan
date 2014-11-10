@@ -10,9 +10,9 @@ from .models import Post
 def my_view(request):
     try:
         posts = Post.get_list(update_counters=True)
-    except DBAPIError:
+    except DBAPIError as ex:
         return Response(
-            'Internal Server Error',
+            'Internal Server Error: {}'.format(ex),
             content_type='text/plain',
             status_int=500,
         )
